@@ -9,7 +9,8 @@ exports.identify = async (req, res, next) => {
     });
   }
   //Finding Primary Contact related to payload data
-  const primaryQuery = `
+  let primaryData = await runQuery(
+    `
         WITH RECURSIVE parentsData AS (
             SELECT id, phoneNumber, email, linkedId, linkPrecedence FROM Contacts WHERE email = ? OR phoneNumber = ?
             UNION ALL
@@ -17,12 +18,9 @@ exports.identify = async (req, res, next) => {
             WHERE c.id=p.linkedId
         )
         SELECT * FROM parentsData WHERE linkPrecedence="primary" GROUP By id
-    `;
-
-  let primaryData = await runQuery(primaryQuery, [
-    req.body.email,
-    req.body.phoneNumber,
-  ]);
+`,
+    [req.body.email, req.body.phoneNumber]
+  );
 
   //If Primary Contact Doesn't exists then create a Primary Contact with Payload Data
   if (req.body.email && req.body.phoneNumber && !primaryData.length) {
@@ -74,7 +72,8 @@ exports.identify = async (req, res, next) => {
   }
 
   //Finding all secondary contacts
-  const secondaryQuery = `
+  const secondaryData = await runQuery(
+    `
         WITH RECURSIVE secondarydata AS (
             SELECT id, phoneNumber, email, linkedId, linkPrecedence FROM Contacts WHERE id = ?
             UNION ALL
@@ -82,9 +81,11 @@ exports.identify = async (req, res, next) => {
             WHERE c.linkedId=p.id
         )
         SELECT * FROM secondarydata WHERE linkPrecedence="secondary"
-    `;
+`,
+    [primary.id]
+  );
 
-  const secondaryData = await runQuery(secondaryQuery, [primary.id]);
+  
   //Returning response
   return res.status(200).json({
     contact: {
