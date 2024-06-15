@@ -17,7 +17,7 @@ exports.identify = async (req, res, next) => {
             SELECT c.id, c.phoneNumber, c.email, c.linkedId, c.linkPrecedence FROM parentsData p INNER JOIN Contacts c 
             WHERE c.id=p.linkedId
         )
-        SELECT * FROM parentsData WHERE linkPrecedence="primary" GROUP By id
+        SELECT id, phoneNumber, email, linkedId, linkPrecedence FROM parentsData WHERE linkPrecedence="primary" GROUP By id
 `,
     [req.body.email, req.body.phoneNumber]
   );
@@ -33,7 +33,7 @@ exports.identify = async (req, res, next) => {
     );
     primaryData = await runQuery(
       `
-        SELECT * FROM Contacts Where id = ?
+        SELECT id, phoneNumber, email, linkedId, linkPrecedence FROM Contacts Where id = ?
     `,
       result.insertId
     );
@@ -44,7 +44,7 @@ exports.identify = async (req, res, next) => {
   //Finding if Payload data contains some new contact
   const findResult = await runQuery(
     `
-        SELECT * FROM Contacts where email = ? and phoneNumber = ?
+        SELECT id, phoneNumber, email, linkedId, linkPrecedence FROM Contacts where email = ? and phoneNumber = ?
     `,
     [req.body.email, req.body.phoneNumber]
   );
@@ -80,12 +80,12 @@ exports.identify = async (req, res, next) => {
             SELECT c.id, c.phoneNumber, c.email, c.linkedId, c.linkPrecedence FROM secondarydata p INNER JOIN Contacts c 
             WHERE c.linkedId=p.id
         )
-        SELECT * FROM secondarydata WHERE linkPrecedence="secondary"
+        SELECT id, phoneNumber, email, linkedId, linkPrecedence FROM secondarydata WHERE linkPrecedence="secondary"
 `,
     [primary.id]
   );
 
-  
+
   //Returning response
   return res.status(200).json({
     contact: {
