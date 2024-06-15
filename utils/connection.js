@@ -12,7 +12,7 @@ module.exports = {
       host: process.env.MYSQL_HOST,
       user: process.env.MYSQL_USER,
       password: process.env.MYSQL_PASSWORD,
-      database: "bitespeed",
+      database: process.env.MYSQL_DB,
       multipleStatements: true
     });
     dbConn.connect(function (err) {
