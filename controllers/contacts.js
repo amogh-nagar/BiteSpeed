@@ -18,7 +18,7 @@ exports.identify = async (req, res, next) => {
             SELECT c.id, c.phoneNumber, c.email, c.linkedId, c.linkPrecedence FROM parentsData p INNER JOIN Contacts c 
             WHERE c.id=p.linkedId
         )
-        SELECT id, phoneNumber, email, linkedId, linkPrecedence FROM parentsData WHERE linkPrecedence="primary" GROUP By id
+        SELECT id, phoneNumber, email, linkedId, linkPrecedence FROM parentsData WHERE linkPrecedence="primary" GROUP By id, phoneNumber, email, linkedId, linkPrecedence
 `,
       [req.body.email, req.body.phoneNumber]
     );
