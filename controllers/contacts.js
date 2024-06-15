@@ -8,9 +8,10 @@ exports.identify = async (req, res, next) => {
       message: "Either email or password is Required",
     });
   }
-  //Finding Primary Contact related to payload data
-  let primaryData = await runQuery(
-    `
+  try {
+    //Finding Primary Contact related to payload data
+    let primaryData = await runQuery(
+      `
         WITH RECURSIVE parentsData AS (
             SELECT id, phoneNumber, email, linkedId, linkPrecedence FROM Contacts WHERE email = ? OR phoneNumber = ?
             UNION ALL
@@ -19,61 +20,61 @@ exports.identify = async (req, res, next) => {
         )
         SELECT id, phoneNumber, email, linkedId, linkPrecedence FROM parentsData WHERE linkPrecedence="primary" GROUP By id
 `,
-    [req.body.email, req.body.phoneNumber]
-  );
+      [req.body.email, req.body.phoneNumber]
+    );
 
-  //If Primary Contact Doesn't exists then create a Primary Contact with Payload Data
-  if (req.body.email && req.body.phoneNumber && !primaryData.length) {
-    const result = await runQuery(
-      `
+    //If Primary Contact Doesn't exists then create a Primary Contact with Payload Data
+    if (req.body.email && req.body.phoneNumber && !primaryData.length) {
+      const result = await runQuery(
+        `
         INSERT INTO Contacts(phoneNumber,email,linkPrecedence) 
         VALUES(?,?,?)
     `,
-      [req.body.phoneNumber, req.body.email, "primary"]
-    );
-    primaryData = await runQuery(
-      `
+        [req.body.phoneNumber, req.body.email, "primary"]
+      );
+      primaryData = await runQuery(
+        `
         SELECT id, phoneNumber, email, linkedId, linkPrecedence FROM Contacts Where id = ?
     `,
-      result.insertId
-    );
-  }
+        result.insertId
+      );
+    }
 
-  const primary = primaryData[0];
+    const primary = primaryData[0];
 
-  //Finding if Payload data contains some new contact
-  const findResult = await runQuery(
-    `
+    //Finding if Payload data contains some new contact
+    const findResult = await runQuery(
+      `
         SELECT id, phoneNumber, email, linkedId, linkPrecedence FROM Contacts where email = ? and phoneNumber = ?
     `,
-    [req.body.email, req.body.phoneNumber]
-  );
-  if (req.body.email && req.body.phoneNumber && !findResult.length) {
-    await runQuery(
-      `
+      [req.body.email, req.body.phoneNumber]
+    );
+    if (req.body.email && req.body.phoneNumber && !findResult.length) {
+      await runQuery(
+        `
     INSERT INTO Contacts(email,phoneNumber,linkedId,linkPrecedence) VALUES(?,?,?,?)
 `,
-      [req.body.email, req.body.phoneNumber, primary.id, "secondary"]
-    );
-  }
-
-  //If more than one primary contact exists than make other as secondary
-  if (primaryData.length > 1) {
-    const queries = primaryData.slice(1).reduce(function (query, curr) {
-      return (
-        query +
-        mysql.format(
-          `UPDATE Contacts SET linkPrecedence="secondary",linkedId=${primary.id} WHERE id = ?`,
-          [curr.id]
-        )
+        [req.body.email, req.body.phoneNumber, primary.id, "secondary"]
       );
-    }, "");
-    await runQuery(queries);
-  }
+    }
 
-  //Finding all secondary contacts
-  const secondaryData = await runQuery(
-    `
+    //If more than one primary contact exists than make other as secondary
+    if (primaryData.length > 1) {
+      const queries = primaryData.slice(1).reduce(function (query, curr) {
+        return (
+          query +
+          mysql.format(
+            `UPDATE Contacts SET linkPrecedence="secondary",linkedId=${primary.id} WHERE id = ?`,
+            [curr.id]
+          )
+        );
+      }, "");
+      await runQuery(queries);
+    }
+
+    //Finding all secondary contacts
+    const secondaryData = await runQuery(
+      `
         WITH RECURSIVE secondarydata AS (
             SELECT id, phoneNumber, email, linkedId, linkPrecedence FROM Contacts WHERE id = ?
             UNION ALL
@@ -82,31 +83,33 @@ exports.identify = async (req, res, next) => {
         )
         SELECT id, phoneNumber, email, linkedId, linkPrecedence FROM secondarydata WHERE linkPrecedence="secondary"
 `,
-    [primary.id]
-  );
+      [primary.id]
+    );
 
-
-  //Returning response
-  return res.status(200).json({
-    contact: {
-      primaryContactId: primary.id,
-      emails: onlyUnique(
-        secondaryData
-          .map(function (sc) {
-            return sc.email;
-          })
-          .concat([primary.email])
-      ),
-      phoneNumbers: onlyUnique(
-        secondaryData
-          .map(function (sc) {
-            return sc.phoneNumber;
-          })
-          .concat([primary.phoneNumber])
-      ),
-      secondaryContactIds: secondaryData.map(function (sc) {
-        return sc.id;
-      }),
-    },
-  });
+    //Returning response
+    return res.status(200).json({
+      contact: {
+        primaryContactId: primary.id,
+        emails: onlyUnique(
+          secondaryData
+            .map(function (sc) {
+              return sc.email;
+            })
+            .concat([primary.email])
+        ),
+        phoneNumbers: onlyUnique(
+          secondaryData
+            .map(function (sc) {
+              return sc.phoneNumber;
+            })
+            .concat([primary.phoneNumber])
+        ),
+        secondaryContactIds: secondaryData.map(function (sc) {
+          return sc.id;
+        }),
+      },
+    });
+  } catch (err) {
+    next(err);
+  }
 };
